@@ -5,5 +5,5 @@
 
 brew install --cask xquartz
 brew install fftw
-brew install imagemagick
-brew install ghostscript
+brew install imagemagick # for cropping
+brew install ghostscript # for raster files

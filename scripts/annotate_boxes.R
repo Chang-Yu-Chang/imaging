@@ -7,7 +7,7 @@ library(Cairo) # for computing and annotating the longest axis
 
 file_pattern <- "Tile_\\d"
 
-folder_raw <- "~/Dropbox/lab/imaging/data/raw/" # input
+folder_raw <- "~/Dropbox/lab/imaging/data/trichome/raw/" # input
 folder_temp <- here::here("data/trichome/temp/") #
 folder_annotated <- here::here("data/trichome/annotated/") # output
 
