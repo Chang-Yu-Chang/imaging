@@ -16,6 +16,12 @@ file_names <- list.files(path = folder_raw, pattern = file_pattern)
 file_names_extracted <- str_extract(file_names, "Tile_\\d+")
 stopifnot(length(file_names) == length(file_names_extracted))
 
+# Functions
+mask_img <- function (img, mask) {
+    if (dim(mask)[4] == 1) mask <- array(rep(mask, 3), dim = c(dim(mask)[1:2], 1, 3))
+    img_masked <- img * mask
+    return(img_masked)
+}
 find_farthest_points <- function (img) {
     #' Input is a binary img with only one pixel set
     img_labeled <- label(img)
@@ -52,7 +58,20 @@ find_farthest_points <- function (img) {
         y = c(centroid[2], lrp1$y[1], lrp2$y[1])
     ))
 }
-draw_sq <- function (img, xc, yc, sl, color = "blue", lwd = 2) {
+draw_axis <- function (img, lrps) {
+    img_axis <- implot(img, lines(c(lrps$x[2], lrps$x[3]), c(lrps$y[2], lrps$y[3]), col = "red", lwd = 4)) # draw line
+    img_axis <- implot(img_axis, points(lrps$x[1], lrps$y[1], col = "red", cex = 5)) # draw point
+    return(img_axis)
+}
+rotate_by_axis <- function (img, lrps) {
+    ## Calculate the angle to rotate (in degrees)
+    delta_x <- lrps$x[2] - lrps$x[3]
+    delta_y <- lrps$y[2] - lrps$y[3]
+    angle <- 90-atan2(delta_y, delta_x) * (180 / pi)  # Convert radians to degrees
+    img_rotated <- imrotate(img, angle)
+    return(img_rotated)
+}
+draw_sqr <- function (img, xc, yc, sl, color = "blue", lwd = 2) {
     # Coordinate of square center
     x0 = xc - sl/2
     x1 = xc + sl/2
@@ -67,69 +86,100 @@ draw_sq <- function (img, xc, yc, sl, color = "blue", lwd = 2) {
 
     return(img_out)
 }
+draw_sqrs <- function (img, lrps, sl = 50) {
+    #sl <- 50 # side length
+    img_box <- draw_sqr(img, lrps$x[1]+sl/2, lrps$y[1]+sl/2, sl) # box 1
+    img_box <- draw_sqr(img_box, lrps$x[1]+sl/2, lrps$y[1] - abs(lrps$y[1]-lrps$y[2])/2, sl) # box 2
+    return(img_box)
+}
+crop_sqr <- function (img, xc, yc, sl = 50) {
+    if ("cimg" %in% class(img)) {
+        img <- cimg2magick(img)
+    } else if ("magick-image" %in% class(img)) {
+        NULL
+    }
+    x0 = xc - sl/2
+    y0 = yc - sl/2
+
+    img_box1 <- image_crop(img, paste0(sl, "x", sl, "+", x0, "+", y0)) %>%
+        magick2cimg()
+
+    return(img_box1)
+}
+
+i=1
+file_name <- file_names[i]
+file_name_extracted <- file_names_extracted[i]
+#annotate_boxes(file_names[i], file_names_extracted[i])
+
+
 annotate_boxes <- function (file_name, file_name_extracted) {
     #'
     cat("\n\nProcessing ", file_name_extracted)
 
     # Load raw images
-    img_raw <- image_read(paste0(folder_raw, file_name))
-    img_raw <- magick2cimg(img_raw)
-    img_raw_cropped <- as.cimg(img_raw[400:2900, 600:3400,1:3])
-    #plot(img_raw_cropped)
+    img_raw <- image_read(paste0(folder_raw, file_name)) %>% magick2cimg()
+    img_raw_cropped <- imsub(img_raw, x>400 & x<=3000, y>400 & y<=3400)
 
-    # Load mask
-    img_mask <- load.image(paste0(folder_temp, file_name_extracted, "/08-mask.png"))
-    img_mask3 <- array(rep(img_mask, 3), dim = c(dim(img_mask)[1:2], 1, 3))
     # Mask
-    img_masked <- img_raw_cropped * img_mask3
-    # Load segmented image
-    img_filled <- load.image(paste0(folder_temp, file_name_extracted, "/07-filled.png"))
+    img_mask <- load.image(paste0(folder_temp, file_name_extracted, "/08-mask.png"))
+    img_masked <- mask_img(img_raw_cropped, img_mask)
     cat("\nLoaded raw and mask")
 
-    # Annotate the longest axis
+    # Annotate the longest diameter
+    img_filled <- load.image(paste0(folder_temp, file_name_extracted, "/07-filled.png")) # Load segmented image
     lrps <- find_farthest_points(img_filled)
-    img_axis <- implot(img_filled, lines(c(lrps$x[2], lrps$x[3]), c(lrps$y[2], lrps$y[3]), col = "red", lwd = 4)) # draw line
-    img_axis <- implot(img_axis, points(lrps$x[1], lrps$y[1], col = "red", cex = 5)) # draw point
+    img_axis <- draw_axis(img_filled, lrps)
     save.image(img_axis, paste0(folder_temp, file_name_extracted, "/11-axis.png"))
-    cat("\nAnnotated the longest axis")
+    cat("\nDrew the longest axis")
 
     # Rotate a image
-    ## Calculate the angle to rotate (in degrees)
-    delta_x <- lrps$x[2] - lrps$x[3]
-    delta_y <- lrps$y[2] - lrps$y[3]
-    angle <- 90-atan2(delta_y, delta_x) * (180 / pi)  # Convert radians to degrees
-    img_rotated <- imrotate(img_filled, angle)
-    lrps <- find_farthest_points(img_rotated)
-    img_rotated_axis <- implot(img_rotated, lines(c(lrps$x[2], lrps$x[3]), c(lrps$y[2], lrps$y[3]), col = "red", lwd = 4))
-    img_rotated_axis <- implot(img_rotated_axis, points(lrps$x[1], lrps$y[1], col = "red", cex = 5)) # draw point
+    img_rotated <- rotate_by_axis(img_axis, lrps)
+    lrps2 <- find_farthest_points(img_rotated)
+    img_rotated_axis <- draw_axis(img_rotated, lrps2)
     save.image(img_rotated_axis, paste0(folder_temp, file_name_extracted, "/12-rotated.png"))
     cat("\nRotated")
 
     # Annotate boxes
-    sl <- 50 # side length
-    img_box <- draw_sq(img_rotated_axis, lrps$x[1]+sl/2, lrps$y[1]+sl/2, sl) # box 1
-    img_box <- draw_sq(img_box, lrps$x[1]+sl/2, lrps$y[1] - abs(lrps$y[1]-lrps$y[2])/2, sl) # box 2
+    img_box <- draw_sqrs(img_rotated_axis, lrps2, sl = 50)
     save.image(img_box, paste0(folder_temp, file_name_extracted, "/13-box.png"))
-    cat("\nAnnotated boxes on the mask")
+    cat("\nDrew boxes on the mask")
 
     # Annotate boxes on raw images
-    lrps <- find_farthest_points(img_rotated)
-    img_raw2 <- img_rotated <- imrotate(img_masked, angle) # rotate
-    img_raw3 <- implot(img_raw2, lines(c(lrps$x[2], lrps$x[3]), c(lrps$y[2], lrps$y[3]), col = "red", lwd = 4)) # add axis
-    img_raw4 <- implot(img_raw3, lines(c(lrps$x[2], lrps$x[3]), c(lrps$y[2], lrps$y[3]), col = "red", lwd = 4)) # add centroid
-    img_raw5 <- draw_sq(img_raw4, lrps$x[1]+sl/2, lrps$y[1]+sl/2, sl) # box 1
-    img_raw6 <- draw_sq(img_raw5, lrps$x[1]+sl/2, lrps$y[1] - abs(lrps$y[1]-lrps$y[2])/2, sl) # box 2
-    cat("\nAnnotated boxes on the raw")
+    #lrps2 <- find_farthest_points(img_masked)
+    img_box_raw <- img_masked %>%
+        rotate_by_axis(lrps) %>%
+        draw_axis(lrps2) %>%
+        draw_sqrs(lrps2)
+    save.image(img_box_raw, paste0(folder_temp, file_name_extracted, "/14-box_raw.png"))
+    cat("\nDrew boxes on the raw")
 
-    save.image(img_raw6, paste0(folder_temp, file_name_extracted, "/14-box_raw.png"))
+    # Output two boxes only
+
+    # img <- img_masked %>%
+    #     rotate_by_axis(lrps)
+    # plot(img)
+    # sl = 2000
+    # img_raw %>%
+    #     imsub(x>=400, x<2900) %>%
+    #     plot
+    #
+    # img %>%
+    #     cimg2magick() %>%
+    #
+    #     #image_crop(paste0(sl, "x", sl, "+", 2000-sl/2, "+", 800-sl/2)) %>%
+    #     magick2cimg() %>%
+    #     plot
+    #
+    # img %>%
+    #     crop_sqr(2000, 800, sl = 2000) %>% plot
+    #     #crop_sqr(lrps2$x[1]+sl/2, lrps2$y[1]+sl/2, sl) %>% plot
+#
+#
+#     boats %>%
+#         pad(20, pos = -1, "xy") %>%
+#         pad(20, pos = 1, "xy") %>%
+#         plot
 }
 
-
-# i=2
-# file_name <- file_names[i]
-# file_name_extracted <- file_names_extracted[i]
-# annotate_boxes(file_names[i], file_names_extracted[i])
-
-for (i in 2:length(file_names)) annotate_boxes(file_names[i], file_names_extracted[i])
-#for (i in 1:length(file_names)) annotate_boxes(file_names[i], file_names_extracted[i])
-
+for (i in 1:length(file_names)) annotate_boxes(file_names[i], file_names_extracted[i])

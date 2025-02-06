@@ -14,6 +14,10 @@ file_names <- list.files(path = folder_seg, pattern = file_pattern)
 file_names_extracted <- str_extract(file_names, "Tile_\\d+")
 stopifnot(length(file_names) == length(file_names_extracted))
 
+# i = 1
+# file_name <- file_names[i]
+# file_name_extracted <- file_names_extracted[i]
+
 
 clean_pixsets <- function (file_name, file_name_extracted, save_imt = T) {
     #' A wrapper function for processing:
@@ -36,7 +40,7 @@ clean_pixsets <- function (file_name, file_name_extracted, save_imt = T) {
     cat("\tSegmentation")
 
     # 1. Manual crop
-    img_cropped <- as.cimg(img_seg[400:2900, 600:3400])
+    img_cropped <- imsub(img_seg, x>400 & x<=3000, y>400 & y<=3400)
     save.image(img_cropped, paste0(folder_temp, file_name_extracted, "/02-cropped.png"))
 
     # 2. Threshold
@@ -81,6 +85,5 @@ clean_pixsets <- function (file_name, file_name_extracted, save_imt = T) {
     save.image(img_tricle, paste0(folder_temp, file_name_extracted, "/10-trichome_cleaned.png"))
 
 }
-
 
 for (i in 1:length(file_names)) clean_pixsets(file_names[i], file_names_extracted[i], save_imt = T)
