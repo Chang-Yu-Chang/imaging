@@ -14,5 +14,5 @@ for file in $folder_full/*.png; do
     mkdir -p $folder_cropped/$filename
 
     # Divide it into roughly equally sized divisions width by 6 and height by 7
-    magick $folder_full/$filename.png -crop 6x7@ +repage $folder_cropped/$filename/%d.jpg
+    magick $folder_full/$filename.png -crop x7@ +repage $folder_cropped/$filename/%d.jpg
 done
