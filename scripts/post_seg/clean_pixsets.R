@@ -46,7 +46,7 @@ clean_pixsets <- function (file_name, file_name_extracted, save_imt = T) {
     # 2. Threshold
     ps_bin <- img_cropped < threshold(img_cropped)
     img_bin <- as.cimg(ps_bin)
-    if (save_imt) save.image(img_bin, paste0(folder_temp, file_name_extracted, "/03-binary.png"))
+    if (save_imt) save.image(img_bin, paste0(folder_temp, file_name_extracted, "/03-threshold.png"))
     cat("\tBinary")
 
     # 3. Create a new binary image containing only large objects
