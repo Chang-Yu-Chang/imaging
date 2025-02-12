@@ -3,8 +3,11 @@
 library(tidyverse)
 library(imager)
 
-file_names <- list.files(path = here::here("data/trichome/temp"), full.names = T)
-file_names_extracted <- str_extract(file_names, "Tile_\\d+")
+folder_data <- "~/Dropbox/lab/imaging/data/"
+folder_temp <- paste0(folder_data, "trichome/temp/") # output
+
+file_names <- list.files(path = paste0(folder_data, "trichome/temp"), full.names = T)
+file_names_extracted <- str_extract(file_names, "\\d_\\d+")
 
 count_fore_pixels <- function(file_name) {
     #' The input must be a binary image
@@ -24,4 +27,4 @@ for (i in 1:length(file_names)) {
 areas <- bind_rows(counts, .id = "sample") %>%
     mutate(trichome_to_leaf = trichome / leaf)
 
-write_csv(areas, here::here("data/trichome/areas.csv"))
+write_csv(areas, paste0(folder_data, "trichome/areas.csv"))
