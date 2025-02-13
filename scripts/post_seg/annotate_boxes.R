@@ -1,6 +1,7 @@
 #' This script annotates the raw image with sampling boxes
 
 library(tidyverse)
+library(here)
 library(imager)
 library(magick) # for loading tiff
 library(Cairo) # for computing and annotating the longest axis
@@ -18,7 +19,7 @@ file_names_extracted <- str_extract(file_names, "\\d_\\d+")
 
 # Functions
 mask_img <- function (img, mask) {
-    if (dim(mask)[4] == 1) mask <- array(rep(mask, 3), dim = c(dim(mask)[1:2], 1, 3))
+    if (dim(img)[4] == 3 & dim(mask)[4] == 1) mask <- array(rep(mask, 3), dim = c(dim(mask)[1:2], 1, 3))
     img_masked <- img * mask
     return(img_masked)
 }
@@ -159,7 +160,7 @@ annotate_boxes <- function (file_name, file_name_extracted) {
     img_rotated <- rotate_by_axis(img_axis, lrps)
     lrps2 <- find_farthest_points(img_rotated)
     #save.image(img_rotated, paste0(folder_temp, file_name_extracted, "/12-rotated.png"))
-    cat("\nRotated")
+    #cat("\nRotated")
 
     # Annotate boxes
     # img_box <- draw_sqrs(img_rotated, lrps2, sl = 50)
@@ -192,6 +193,17 @@ annotate_boxes <- function (file_name, file_name_extracted) {
     img_mt2 <- as.cimg(array(rep(img_m2, 3), dim = c(dim(img_m2)[1], dim(img_m2)[2], 3)))
     img_masked2 <- img_r2 * img_mt * img_mt2
     save.image(img_masked2, paste0(folder_temp, file_name_extracted, "/16-masked_squares.png"))
+
+    # Crop the trichome segments
+    sl=138
+    img_trichome <- load.image(paste0(folder_temp, file_name_extracted, "/10-trichome_cleaned.png"))
+    img_tri_masked <- mask_img(img_trichome, img_mask)
+    img_r2 <- img_tri_masked %>% rotate_by_axis(lrps)
+    img_box1 <- img_r2 %>% crop_sqr(lrps2$x[1]+sl/2, lrps2$y[1]+sl/2, sl)
+    img_box2 <- img_r2 %>% crop_sqr(lrps2$x[1]+sl/2, lrps2$y[1] - abs(lrps2$y[1]-lrps2$y[2])/2, sl)
+    img_sqr <- imappend(list(img_box1, cimg(array(0, c(10, sl, 1, 1))), img_box2), "x")
+    save.image(img_sqr, paste0(folder_temp, file_name_extracted, "/17-trichome_squares.png"))
+    cat("\nCropped out the squares")
 
 }
 
