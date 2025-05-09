@@ -61,7 +61,8 @@ clean_pixsets <- function (file_name, file_name_extracted, save_imt = T) {
     cat("\tKept large pixsets")
 
     # 4. Fill the pixsets
-    img_filled <- fill(img_large, 3) %>% as.cimg()
+    img_filled <- fill(img_large, 20) %>% as.cimg()
+    plot(img_filled)
     save.image(img_filled, paste0(folder_temp, file_name_extracted, "/04-filled.png"))
     cat("\tFilled")
 
